@@ -1,7 +1,6 @@
 export type Cell = {
     row: number;
     col: number;
-    zone: number;
 };
 
 export type GameGrid = {

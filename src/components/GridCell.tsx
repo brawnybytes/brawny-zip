@@ -1,27 +1,14 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
-import {Cell} from '../game/types';
+import { StyleSheet, Text, View } from 'react-native';
 
 type Props = {
-    cell: Cell;
     nodeNumber?: number;
-    isInPath: boolean;
-    isLast: boolean;
     cellSize: number;
 };
 
-export const GridCell = ({nodeNumber, cellSize}: Props) => {
+export const GridCell = ({ nodeNumber, cellSize }: Props) => {
     return (
-        <View
-            style={[
-                styles.cell,
-                {
-                    width: cellSize,
-                    height: cellSize,
-                    backgroundColor: '#fff',
-                },
-            ]}
-        >
+        <View style={[styles.cell, { width: cellSize, height: cellSize }]}>
             {nodeNumber && (
                 <View style={styles.nodeBadge}>
                     <Text style={styles.nodeText}>{nodeNumber}</Text>

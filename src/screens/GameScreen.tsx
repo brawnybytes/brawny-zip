@@ -1,47 +1,66 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {Dimensions, PanResponder, StyleSheet, Text, TouchableOpacity, View,} from 'react-native';
-import {GridCell} from '../components/GridCell';
-import {PathLine} from '../components/PathLine';
-import {canMoveTo, cellKey, isGameComplete} from '../game/gameLogic';
-import {WinScreen} from '../components/WinScreen';
-import {generatePuzzle, getDifficultyLabel} from '../game/generator';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Dimensions,
+    PanResponder,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { GridCell } from '../components/GridCell';
+import { PathLine } from '../components/PathLine';
+import { canMoveTo, cellKey, isGameComplete } from '../game/gameLogic';
+import { WinScreen } from '../components/WinScreen';
+import { generatePuzzle, getDifficultyLabel } from '../game/generator';
+import { saveLevel } from '../game/storage';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PADDING = 24;
 const GRID_SIZE = SCREEN_WIDTH - PADDING * 2;
 
-export const GameScreen = () => {
-    const [level, setLevel] = useState(1);
-    const [grid, setGrid] = useState(() => generatePuzzle(1));
+type Props = {
+    initialLevel: number;
+    onLevelChange: (level: number) => void;
+    onHome: () => void;
+};
+
+export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
+    const [level, setLevel] = useState(initialLevel);
+    const [grid, setGrid] = useState(() => generatePuzzle(initialLevel));
+    const [path, setPath] = useState<{ row: number; col: number }[]>([]);
+    const [isComplete, setIsComplete] = useState(false);
+    const [seconds, setSeconds] = useState(0);
 
     const gridDataRef = useRef(grid);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const gridOffset = useRef({ x: 0, y: 0 });
+
+    const cellSize = GRID_SIZE / grid.size;
+
     useEffect(() => {
         gridDataRef.current = grid;
     }, [grid]);
 
-    const cellSize = GRID_SIZE / grid.size;
-
-    const [path, setPath] = useState<{ row: number; col: number }[]>([]);
-    const [isComplete, setIsComplete] = useState(false);
-    const [seconds, setSeconds] = useState(0);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-    const gridOffset = useRef({x: 0, y: 0});
-
     useEffect(() => {
-        timerRef.current = setInterval(() => {
-            setSeconds(s => s + 1);
-        }, 1000);
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-        };
+        startTimer();
+        return () => stopTimer();
     }, []);
 
     useEffect(() => {
-        if (isComplete && timerRef.current) {
-            clearInterval(timerRef.current);
-        }
+        if (isComplete) stopTimer();
     }, [isComplete]);
+
+    const startTimer = () => {
+        stopTimer();
+        timerRef.current = setInterval(() => {
+            setSeconds(s => s + 1);
+        }, 1000);
+    };
+
+    const stopTimer = () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+    };
 
     const formatTime = (s: number) => {
         const m = Math.floor(s / 60);
@@ -53,16 +72,13 @@ export const GameScreen = () => {
         const col = Math.floor(x / cellSize);
         const row = Math.floor(y / cellSize);
         if (row >= 0 && row < grid.size && col >= 0 && col < grid.size) {
-            return {row, col};
+            return { row, col };
         }
         return null;
     };
 
     const handleUndo = () => {
-        setPath(prev => {
-            if (prev.length <= 1) return [];
-            return prev.slice(0, prev.length - 1);
-        });
+        setPath(prev => (prev.length <= 1 ? [] : prev.slice(0, prev.length - 1)));
         setIsComplete(false);
     };
 
@@ -79,10 +95,26 @@ export const GameScreen = () => {
         });
     };
 
-    const pathRef = useRef(path);
-    useEffect(() => {
-        pathRef.current = path;
-    }, [path]);
+    const handleNextPuzzle = () => {
+        const nextLevel = level + 1;
+        const newGrid = generatePuzzle(nextLevel);
+        setLevel(nextLevel);
+        setGrid(newGrid);
+        gridDataRef.current = newGrid;
+        setPath([]);
+        setIsComplete(false);
+        setSeconds(0);
+        saveLevel(nextLevel);
+        onLevelChange(nextLevel);
+        startTimer();
+    };
+
+    const handleReplay = () => {
+        setPath([]);
+        setIsComplete(false);
+        setSeconds(0);
+        startTimer();
+    };
 
     const panResponder = useRef(
         PanResponder.create({
@@ -92,12 +124,11 @@ export const GameScreen = () => {
             onMoveShouldSetPanResponderCapture: () => true,
 
             onPanResponderGrant: (evt) => {
-                const {pageX, pageY} = evt.nativeEvent;
+                const { pageX, pageY } = evt.nativeEvent;
                 const x = pageX - gridOffset.current.x;
                 const y = pageY - gridOffset.current.y;
                 const cell = getCellFromTouch(x, y);
                 if (!cell) return;
-
                 const key = cellKey(cell);
                 if (gridDataRef.current.nodes[key] === 1) {
                     setPath([cell]);
@@ -106,7 +137,7 @@ export const GameScreen = () => {
             },
 
             onPanResponderMove: (evt) => {
-                const {pageX, pageY} = evt.nativeEvent;
+                const { pageX, pageY } = evt.nativeEvent;
                 const x = pageX - gridOffset.current.x;
                 const y = pageY - gridOffset.current.y;
                 const cell = getCellFromTouch(x, y);
@@ -116,82 +147,66 @@ export const GameScreen = () => {
                     if (prev.length === 0) return prev;
 
                     const existingIndex = prev.findIndex(
-                        (p) => p.row === cell.row && p.col === cell.col
+                        p => p.row === cell.row && p.col === cell.col
                     );
-                    if (existingIndex !== -1) {
-                        return prev.slice(0, existingIndex + 1);
-                    }
+                    if (existingIndex !== -1) return prev.slice(0, existingIndex + 1);
 
                     if (!canMoveTo(cell, prev, gridDataRef.current)) return prev;
 
                     const newPath = [...prev, cell];
 
                     if (isGameComplete(newPath, gridDataRef.current)) {
-                        setIsComplete(true);
+                        setTimeout(() => setIsComplete(true), 1000);
                     }
 
                     return newPath;
                 });
             },
 
-            onPanResponderRelease: () => {
-            },
+            onPanResponderRelease: () => {},
         })
     ).current;
 
     const pathSet = new Set(path.map(cellKey));
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {isComplete && (
                 <WinScreen
                     seconds={seconds}
-                    onReplay={() => {
-                        setPath([]);
-                        setIsComplete(false);
-                    }}
-                    onNextPuzzle={() => {
-                        const nextLevel = level + 1;
-                        setLevel(nextLevel);
-                        const newGrid = generatePuzzle(nextLevel);
-                        setGrid(newGrid);
-                        setPath([]);
-                        setIsComplete(false);
-                        setSeconds(0);
-                        if (timerRef.current) clearInterval(timerRef.current);
-                        timerRef.current = setInterval(() => {
-                            setSeconds(s => s + 1);
-                        }, 1000);
-                    }}
+                    level={level}
+                    onReplay={handleReplay}
+                    onNextPuzzle={handleNextPuzzle}
                 />
             )}
 
             {/* header */}
             <View style={styles.header}>
-                <Text style={styles.timerText}>⏱ {formatTime(seconds)}</Text>
+                <TouchableOpacity onPress={onHome}>
+                    <Text style={styles.homeButton}>← Home</Text>
+                </TouchableOpacity>
                 <Text style={styles.title}>Level {level}</Text>
                 <Text style={styles.difficultyText}>{getDifficultyLabel(level)}</Text>
             </View>
 
+            {/* timer */}
+            <Text style={styles.timerText}>{formatTime(seconds)}</Text>
+
             {/* board */}
             <View style={styles.board}>
                 <View
-                    style={{position: 'relative', width: GRID_SIZE, height: GRID_SIZE}}
-                    onLayout={(evt) => {
-                        const {x, y} = evt.nativeEvent.layout;
-                        // use measure for absolute page position
-                    }}
+                    style={{ position: 'relative', width: GRID_SIZE, height: GRID_SIZE }}
                     ref={(ref) => {
                         if (ref) {
                             ref.measure((_x, _y, _w, _h, pageX, pageY) => {
-                                gridOffset.current = {x: pageX, y: pageY};
+                                gridOffset.current = { x: pageX, y: pageY };
                             });
                         }
                     }}
                     {...panResponder.panHandlers}
                 >
                     {/* cells layer */}
-                    <View style={{position: 'absolute', top: 0, left: 0}}>
+                    <View style={{ position: 'absolute', top: 0, left: 0 }}>
                         {grid.cells.map((row, rowIndex) => (
                             <View key={rowIndex} style={styles.row}>
                                 {row.map((cell, colIndex) => {
@@ -203,10 +218,7 @@ export const GameScreen = () => {
                                     return (
                                         <GridCell
                                             key={colIndex}
-                                            cell={cell}
                                             nodeNumber={grid.nodes[key]}
-                                            isInPath={pathSet.has(key)}
-                                            isLast={isLast}
                                             cellSize={cellSize}
                                         />
                                     );
@@ -215,7 +227,7 @@ export const GameScreen = () => {
                         ))}
                     </View>
 
-                    {/* path line layer — above cells but below nodes */}
+                    {/* path line layer */}
                     <PathLine
                         path={path}
                         cellSize={cellSize}
@@ -223,7 +235,7 @@ export const GameScreen = () => {
                     />
 
                     {/* nodes layer — always on top */}
-                    <View style={{position: 'absolute', top: 0, left: 0}}>
+                    <View style={{ position: 'absolute', top: 0, left: 0 }}>
                         {Object.entries(grid.nodes).map(([key, number]) => {
                             const [row, col] = key.split('-').map(Number);
                             return (
@@ -242,14 +254,13 @@ export const GameScreen = () => {
                                         zIndex: 100,
                                     }}
                                 >
-                                    <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 14}}>
+                                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>
                                         {number}
                                     </Text>
                                 </View>
                             );
                         })}
                     </View>
-
                 </View>
             </View>
 
@@ -265,8 +276,7 @@ export const GameScreen = () => {
                     <Text style={styles.buttonText}>Hint</Text>
                 </TouchableOpacity>
             </View>
-
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -282,7 +292,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         width: GRID_SIZE,
-        marginBottom: 20,
+        marginBottom: 8,
+    },
+    homeButton: {
+        color: '#00933c',
+        fontSize: 14,
+        fontWeight: '500',
     },
     title: {
         color: '#000',
@@ -294,6 +309,7 @@ const styles = StyleSheet.create({
         color: '#000',
         fontSize: 14,
         fontWeight: '500',
+        marginBottom: 16,
     },
     difficultyText: {
         color: '#555',
@@ -312,12 +328,6 @@ const styles = StyleSheet.create({
     },
     row: {
         flexDirection: 'row',
-    },
-    successText: {
-        color: '#4CAF50',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 16,
     },
     bottomBar: {
         flexDirection: 'row',

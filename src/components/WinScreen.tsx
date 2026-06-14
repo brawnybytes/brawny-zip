@@ -5,6 +5,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type Props = {
     seconds: number;
+    level: number;
     onNextPuzzle: () => void;
     onReplay: () => void;
 };
@@ -15,23 +16,49 @@ const formatTime = (s: number) => {
     return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
-export const WinScreen = ({seconds, onNextPuzzle, onReplay}: Props) => {
+const getStars = (seconds: number): number => {
+    if (seconds < 60) return 3;
+    if (seconds < 120) return 2;
+    return 1;
+};
+
+const StarRow = ({stars}: { stars: number }) => {
+    return (
+        <View style={styles.starRow}>
+            {[1, 2, 3].map(i => (
+                <Text key={i} style={[styles.star, i <= stars ? styles.starFilled : styles.starEmpty]}>
+                    ★
+                </Text>
+            ))}
+        </View>
+    );
+};
+
+export const WinScreen = ({seconds, level, onNextPuzzle, onReplay}: Props) => {
+    const stars = getStars(seconds);
+
     return (
         <View style={styles.overlay}>
             <View style={styles.card}>
-                <Text style={styles.emoji}>🎉</Text>
-                <Text style={styles.title}>Puzzle Complete!</Text>
-                <Text style={styles.subtitle}>You solved it in</Text>
-                <Text style={styles.time}>{formatTime(seconds)}</Text>
+
+                <Text style={styles.levelText}>Level {level} Complete!</Text>
+
+                <StarRow stars={stars}/>
+
+                <View style={styles.timeRow}>
+                    <Text style={styles.timeLabel}>Time</Text>
+                    <Text style={styles.timeValue}>{formatTime(seconds)}</Text>
+                </View>
 
                 <View style={styles.buttonRow}>
                     <TouchableOpacity style={styles.secondaryButton} onPress={onReplay}>
                         <Text style={styles.secondaryButtonText}>Play Again</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.primaryButton} onPress={onNextPuzzle}>
-                        <Text style={styles.primaryButtonText}>Next Puzzle</Text>
+                        <Text style={styles.primaryButtonText}>Next Level</Text>
                     </TouchableOpacity>
                 </View>
+
             </View>
         </View>
     );
@@ -55,27 +82,38 @@ const styles = StyleSheet.create({
         padding: 32,
         width: SCREEN_WIDTH - 48,
         alignItems: 'center',
+        gap: 20,
     },
-    emoji: {
-        fontSize: 48,
-        marginBottom: 12,
-    },
-    title: {
-        fontSize: 24,
+    levelText: {
+        fontSize: 22,
         fontWeight: 'bold',
         color: '#000',
-        marginBottom: 8,
     },
-    subtitle: {
-        fontSize: 14,
+    starRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    star: {
+        fontSize: 40,
+    },
+    starFilled: {
+        color: '#FFD700',
+    },
+    starEmpty: {
+        color: '#ddd',
+    },
+    timeRow: {
+        alignItems: 'center',
+    },
+    timeLabel: {
+        fontSize: 13,
         color: '#888',
-        marginBottom: 4,
+        marginBottom: 2,
     },
-    time: {
-        fontSize: 36,
+    timeValue: {
+        fontSize: 32,
         fontWeight: 'bold',
         color: '#00933c',
-        marginBottom: 28,
     },
     buttonRow: {
         flexDirection: 'row',

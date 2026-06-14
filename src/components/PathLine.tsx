@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, {Polyline, Rect} from 'react-native-svg';
+import Svg, { Polyline, Rect } from 'react-native-svg';
 
 type SimpleCell = { row: number; col: number };
 
@@ -9,11 +9,11 @@ type Props = {
     gridSize: number;
 };
 
-export const PathLine = ({path, cellSize, gridSize}: Props) => {
-    if (path.length < 2) return null;
+export const PathLine = ({ path, cellSize, gridSize }: Props) => {
+    if (path.length === 0) return null;
 
     const offset = cellSize / 2;
-    const padding = 1; // keeps grid lines visible
+    const padding = 1;
 
     const visitedRects = path.map((cell, i) => (
         <Rect
@@ -27,29 +27,27 @@ export const PathLine = ({path, cellSize, gridSize}: Props) => {
     ));
 
     const points = path
-        .map(cell => {
-            const x = cell.col * cellSize + offset;
-            const y = cell.row * cellSize + offset;
-            return `${x},${y}`;
-        })
+        .map(cell => `${cell.col * cellSize + offset},${cell.row * cellSize + offset}`)
         .join(' ');
 
     return (
         <Svg
             width={gridSize}
             height={gridSize}
-            style={{position: 'absolute', top: 0, left: 0}}
+            style={{ position: 'absolute', top: 0, left: 0 }}
             pointerEvents="none"
         >
             {visitedRects}
-            <Polyline
-                points={points}
-                fill="none"
-                stroke="#00933c"
-                strokeWidth={cellSize * 0.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+            {path.length >= 2 && (
+                <Polyline
+                    points={points}
+                    fill="none"
+                    stroke="#00933c"
+                    strokeWidth={cellSize * 0.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            )}
         </Svg>
     );
 };
