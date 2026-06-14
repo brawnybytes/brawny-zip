@@ -5,21 +5,24 @@ import { StyleSheet } from 'react-native';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { GameScreen } from './src/screens/GameScreen';
 import { LoadingScreen } from './src/components/LoadingScreen';
-import { loadLevel } from './src/game/storage';
+import { loadLevel, loadTotalStars } from './src/game/storage';
 
 type Screen = 'loading' | 'home' | 'game';
 
 export default function App() {
     const [screen, setScreen] = useState<Screen>('loading');
     const [currentLevel, setCurrentLevel] = useState(1);
+    const [totalStars, setTotalStars] = useState(0);
 
     useEffect(() => {
-        loadLevel()
-            .then(savedLevel => {
+        Promise.all([loadLevel(), loadTotalStars()])
+            .then(([savedLevel, savedStars]) => {
                 setCurrentLevel(savedLevel);
+                setTotalStars(savedStars);
             })
             .catch(() => {
                 setCurrentLevel(1);
+                setTotalStars(0);
             })
             .finally(() => {
                 setScreen('home');
@@ -33,6 +36,7 @@ export default function App() {
             {screen === 'home' && (
                 <HomeScreen
                     level={currentLevel}
+                    totalStars={totalStars}
                     onPlay={() => setScreen('game')}
                 />
             )}
@@ -40,7 +44,10 @@ export default function App() {
                 <GameScreen
                     initialLevel={currentLevel}
                     onLevelChange={setCurrentLevel}
-                    onHome={() => setScreen('home')}
+                    onHome={() => {
+                        loadTotalStars().then(stars => setTotalStars(stars));
+                        setScreen('home');
+                    }}
                 />
             )}
         </GestureHandlerRootView>

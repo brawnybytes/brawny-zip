@@ -1,21 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-    Dimensions,
-    PanResponder,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import { GridCell } from '../components/GridCell';
-import { PathLine } from '../components/PathLine';
-import { canMoveTo, cellKey, isGameComplete } from '../game/gameLogic';
-import { WinScreen } from '../components/WinScreen';
-import { generatePuzzle, getDifficultyLabel } from '../game/generator';
-import { saveLevel } from '../game/storage';
-import { LoadingScreen } from '../components/LoadingScreen';
-import { getTheme } from '../game/themes';
+import React, {useEffect, useRef, useState} from 'react';
+import {Dimensions, PanResponder, SafeAreaView, StyleSheet, Text, TouchableOpacity, View,} from 'react-native';
+import {GridCell} from '../components/GridCell';
+import {PathLine} from '../components/PathLine';
+import {canMoveTo, cellKey, isGameComplete} from '../game/gameLogic';
+import {WinScreen} from '../components/WinScreen';
+import {generatePuzzle, getDifficultyLabel} from '../game/generator';
+import {loadTotalStars, saveLevel, saveTotalStars} from '../game/storage';
+import {LoadingScreen} from '../components/LoadingScreen';
+import {getTheme} from '../game/themes';
+import {loadSounds, playComplete} from '../game/sounds';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PADDING = 24;
@@ -27,7 +20,7 @@ type Props = {
     onHome: () => void;
 };
 
-export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
+export const GameScreen = ({initialLevel, onLevelChange, onHome}: Props) => {
     const [level, setLevel] = useState(initialLevel);
     const [grid, setGrid] = useState(() => generatePuzzle(initialLevel));
     const [path, setPath] = useState<{ row: number; col: number }[]>([]);
@@ -35,11 +28,14 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [seconds, setSeconds] = useState(0);
     const [hintsUsed, setHintsUsed] = useState(0);
+    const [totalStars, setTotalStars] = useState(0);
+    const totalStarsRef = useRef(0);
+    const secondsRef = useRef(0);
     const MAX_HINTS = 3;
 
     const gridDataRef = useRef(grid);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const gridOffset = useRef({ x: 0, y: 0 });
+    const gridOffset = useRef({x: 0, y: 0});
 
     const cellSize = GRID_SIZE / grid.size;
     const theme = getTheme(level);
@@ -50,9 +46,13 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
 
     useEffect(() => {
         startTimer();
+        loadSounds();
+        loadTotalStars().then(stars => {
+            setTotalStars(stars);
+            totalStarsRef.current = stars;
+        });
         return () => stopTimer();
     }, []);
-
     useEffect(() => {
         if (isComplete) stopTimer();
     }, [isComplete]);
@@ -60,7 +60,10 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const startTimer = () => {
         stopTimer();
         timerRef.current = setInterval(() => {
-            setSeconds(s => s + 1);
+            setSeconds(s => {
+                secondsRef.current = s + 1;
+                return s + 1;
+            });
         }, 1000);
     };
 
@@ -78,7 +81,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
         const col = Math.floor(x / cellSize);
         const row = Math.floor(y / cellSize);
         if (row >= 0 && row < grid.size && col >= 0 && col < grid.size) {
-            return { row, col };
+            return {row, col};
         }
         return null;
     };
@@ -139,7 +142,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
             onMoveShouldSetPanResponderCapture: () => true,
 
             onPanResponderGrant: (evt) => {
-                const { pageX, pageY } = evt.nativeEvent;
+                const {pageX, pageY} = evt.nativeEvent;
                 const x = pageX - gridOffset.current.x;
                 const y = pageY - gridOffset.current.y;
                 const cell = getCellFromTouch(x, y);
@@ -152,7 +155,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
             },
 
             onPanResponderMove: (evt) => {
-                const { pageX, pageY } = evt.nativeEvent;
+                const {pageX, pageY} = evt.nativeEvent;
                 const x = pageX - gridOffset.current.x;
                 const y = pageY - gridOffset.current.y;
                 const cell = getCellFromTouch(x, y);
@@ -171,26 +174,38 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                     const newPath = [...prev, cell];
 
                     if (isGameComplete(newPath, gridDataRef.current)) {
-                        setTimeout(() => setIsComplete(true), 1000);
+                        setTimeout(() => {
+                            playComplete();
+                        }, 100);
+                        setTimeout(() => {
+                            setIsComplete(true);
+                            const earned = secondsRef.current < 60 ? 3 : secondsRef.current < 120 ? 2 : 1;
+                            const newTotal = totalStarsRef.current + earned;
+                            totalStarsRef.current = newTotal;
+                            setTotalStars(newTotal);
+                            saveTotalStars(newTotal);
+                        }, 2000);
                     }
 
                     return newPath;
                 });
             },
 
-            onPanResponderRelease: () => {},
+            onPanResponderRelease: () => {
+            },
         })
     ).current;
 
     const pathSet = new Set(path.map(cellKey));
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            {isLoading && <LoadingScreen />}
+        <SafeAreaView style={[styles.container, {backgroundColor: theme.background}]}>
+            {isLoading && <LoadingScreen/>}
             {isComplete && (
                 <WinScreen
                     seconds={seconds}
                     level={level}
+                    totalStars={totalStars}
                     onReplay={handleReplay}
                     onNextPuzzle={handleNextPuzzle}
                 />
@@ -199,30 +214,30 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
             {/* header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onHome}>
-                    <Text style={[styles.homeButton, { color: theme.pathColor }]}>← Home</Text>
+                    <Text style={[styles.homeButton, {color: theme.pathColor}]}>← Home</Text>
                 </TouchableOpacity>
-                <Text style={[styles.title, { color: theme.titleColor }]}>Level {level}</Text>
-                <Text style={[styles.difficultyText, { color: theme.timerColor }]}>{getDifficultyLabel(level)}</Text>
+                <Text style={[styles.title, {color: theme.titleColor}]}>Level {level}</Text>
+                <Text style={[styles.difficultyText, {color: theme.timerColor}]}>{getDifficultyLabel(level)}</Text>
             </View>
 
             {/* timer */}
-            <Text style={[styles.timerText, { color: theme.timerColor }]}>{formatTime(seconds)}</Text>
+            <Text style={[styles.timerText, {color: theme.timerColor}]}>{formatTime(seconds)}</Text>
 
             {/* board */}
-            <View style={[styles.board, { borderColor: theme.gridLine, backgroundColor: theme.boardBackground }]}>
+            <View style={[styles.board, {borderColor: theme.gridLine, backgroundColor: theme.boardBackground}]}>
                 <View
-                    style={{ position: 'relative', width: GRID_SIZE, height: GRID_SIZE }}
+                    style={{position: 'relative', width: GRID_SIZE, height: GRID_SIZE}}
                     ref={(ref) => {
                         if (ref) {
                             ref.measure((_x, _y, _w, _h, pageX, pageY) => {
-                                gridOffset.current = { x: pageX, y: pageY };
+                                gridOffset.current = {x: pageX, y: pageY};
                             });
                         }
                     }}
                     {...panResponder.panHandlers}
                 >
                     {/* cells layer */}
-                    <View style={{ position: 'absolute', top: 0, left: 0 }}>
+                    <View style={{position: 'absolute', top: 0, left: 0}}>
                         {grid.cells.map((row, rowIndex) => (
                             <View key={rowIndex} style={styles.row}>
                                 {row.map((cell, colIndex) => {
@@ -256,7 +271,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                     />
 
                     {/* nodes layer — always on top */}
-                    <View style={{ position: 'absolute', top: 0, left: 0 }}>
+                    <View style={{position: 'absolute', top: 0, left: 0}}>
                         {Object.entries(grid.nodes).map(([key, number]) => {
                             const [row, col] = key.split('-').map(Number);
                             return (
@@ -275,7 +290,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                                         zIndex: 100,
                                     }}
                                 >
-                                    <Text style={{ color: theme.nodeText, fontWeight: 'bold', fontSize: 14 }}>
+                                    <Text style={{color: theme.nodeText, fontWeight: 'bold', fontSize: 14}}>
                                         {number}
                                     </Text>
                                 </View>
@@ -287,18 +302,19 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
 
             {/* bottom buttons */}
             <View style={styles.bottomBar}>
-                <TouchableOpacity style={[styles.button, { borderColor: theme.buttonBorder }]} onPress={handleUndo}>
-                    <Text style={[styles.buttonText, { color: theme.titleColor }]}>Undo</Text>
+                <TouchableOpacity style={[styles.button, {borderColor: theme.buttonBorder}]} onPress={handleUndo}>
+                    <Text style={[styles.buttonText, {color: theme.titleColor}]}>Undo</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, { borderColor: theme.buttonBorder }]} onPress={handleReset}>
-                    <Text style={[styles.buttonText, { color: theme.titleColor }]}>Reset</Text>
+                <TouchableOpacity style={[styles.button, {borderColor: theme.buttonBorder}]} onPress={handleReset}>
+                    <Text style={[styles.buttonText, {color: theme.titleColor}]}>Reset</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.button, { borderColor: theme.buttonBorder }, hintsUsed >= MAX_HINTS && styles.buttonDisabled]}
+                    style={[styles.button, {borderColor: theme.buttonBorder}, hintsUsed >= MAX_HINTS && styles.buttonDisabled]}
                     onPress={handleHint}
                     disabled={hintsUsed >= MAX_HINTS}
                 >
-                    <Text style={[styles.buttonText, { color: theme.titleColor }, hintsUsed >= MAX_HINTS && styles.buttonTextDisabled]}>
+                    <Text
+                        style={[styles.buttonText, {color: theme.titleColor}, hintsUsed >= MAX_HINTS && styles.buttonTextDisabled]}>
                         Hint {MAX_HINTS - hintsUsed}/{MAX_HINTS}
                     </Text>
                 </TouchableOpacity>

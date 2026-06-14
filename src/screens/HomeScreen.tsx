@@ -7,15 +7,20 @@ import {
     Dimensions,
     SafeAreaView,
 } from 'react-native';
+import { getMedal } from '../game/medals';
+import { playComplete } from '../game/sounds';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type Props = {
     level: number;
+    totalStars: number;
     onPlay: () => void;
 };
 
-export const HomeScreen = ({ level, onPlay }: Props) => {
+export const HomeScreen = ({ level, totalStars, onPlay }: Props) => {
+    const medal = getMedal(totalStars);
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
@@ -30,6 +35,15 @@ export const HomeScreen = ({ level, onPlay }: Props) => {
                 <View style={styles.levelBadge}>
                     <Text style={styles.levelLabel}>Current Level</Text>
                     <Text style={styles.levelNumber}>{level}</Text>
+                </View>
+
+                {/* medal */}
+                <View style={[styles.medalRow, { backgroundColor: medal.color, borderColor: medal.color }]}>
+                    <Text style={styles.medalEmoji}>{medal.emoji}</Text>
+                    <View>
+                        <Text style={[styles.medalName, { color: medal.textColor }]}>{medal.name}</Text>
+                        <Text style={[styles.medalStars, { color: medal.textColor, opacity: 0.7 }]}>{totalStars} stars collected</Text>
+                    </View>
                 </View>
 
                 {/* play button */}
@@ -94,6 +108,31 @@ const styles = StyleSheet.create({
         fontSize: 48,
         fontWeight: 'bold',
         color: '#00933c',
+    },
+    medalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#f5f5f5',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 16,
+        borderWidth: 0.5,
+        borderColor: '#a3a19c',
+        width: '100%',
+    },
+    medalEmoji: {
+        fontSize: 36,
+    },
+    medalName: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    medalStars: {
+        fontSize: 13,
+        color: '#888',
+        marginTop: 2,
     },
     playButton: {
         backgroundColor: '#00933c',
