@@ -14,6 +14,7 @@ import { canMoveTo, cellKey, isGameComplete } from '../game/gameLogic';
 import { WinScreen } from '../components/WinScreen';
 import { generatePuzzle, getDifficultyLabel } from '../game/generator';
 import { saveLevel } from '../game/storage';
+import { LoadingScreen } from '../components/LoadingScreen';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PADDING = 24;
@@ -30,7 +31,10 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const [grid, setGrid] = useState(() => generatePuzzle(initialLevel));
     const [path, setPath] = useState<{ row: number; col: number }[]>([]);
     const [isComplete, setIsComplete] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [seconds, setSeconds] = useState(0);
+    const [hintsUsed, setHintsUsed] = useState(0);
+    const MAX_HINTS = 3;
 
     const gridDataRef = useRef(grid);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -85,9 +89,12 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const handleReset = () => {
         setPath([]);
         setIsComplete(false);
+        setHintsUsed(0);
     };
 
     const handleHint = () => {
+        if (hintsUsed >= MAX_HINTS) return;
+        setHintsUsed(prev => prev + 1);
         setPath(prev => {
             const nextIndex = prev.length;
             if (nextIndex >= grid.solution.length) return prev;
@@ -96,23 +103,29 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     };
 
     const handleNextPuzzle = () => {
-        const nextLevel = level + 1;
-        const newGrid = generatePuzzle(nextLevel);
-        setLevel(nextLevel);
-        setGrid(newGrid);
-        gridDataRef.current = newGrid;
-        setPath([]);
         setIsComplete(false);
-        setSeconds(0);
-        saveLevel(nextLevel);
-        onLevelChange(nextLevel);
-        startTimer();
+        setIsLoading(true);
+        setTimeout(() => {
+            const nextLevel = level + 1;
+            const newGrid = generatePuzzle(nextLevel);
+            setLevel(nextLevel);
+            setGrid(newGrid);
+            gridDataRef.current = newGrid;
+            setPath([]);
+            setSeconds(0);
+            setHintsUsed(0);
+            setIsLoading(false);
+            saveLevel(nextLevel);
+            onLevelChange(nextLevel);
+            startTimer();
+        }, 300);
     };
 
     const handleReplay = () => {
         setPath([]);
         setIsComplete(false);
         setSeconds(0);
+        setHintsUsed(0);
         startTimer();
     };
 
@@ -171,6 +184,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
 
     return (
         <SafeAreaView style={styles.container}>
+            {isLoading && <LoadingScreen />}
             {isComplete && (
                 <WinScreen
                     seconds={seconds}
@@ -272,8 +286,14 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                 <TouchableOpacity style={styles.button} onPress={handleReset}>
                     <Text style={styles.buttonText}>Reset</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.button} onPress={handleHint}>
-                    <Text style={styles.buttonText}>Hint</Text>
+                <TouchableOpacity
+                    style={[styles.button, hintsUsed >= MAX_HINTS && styles.buttonDisabled]}
+                    onPress={handleHint}
+                    disabled={hintsUsed >= MAX_HINTS}
+                >
+                    <Text style={[styles.buttonText, hintsUsed >= MAX_HINTS && styles.buttonTextDisabled]}>
+                        Hint {MAX_HINTS - hintsUsed}/{MAX_HINTS}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -281,6 +301,13 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
 };
 
 const styles = StyleSheet.create({
+    buttonDisabled: {
+        borderColor: '#ddd',
+        backgroundColor: '#fafafa',
+    },
+    buttonTextDisabled: {
+        color: '#bbb',
+    },
     container: {
         flex: 1,
         backgroundColor: '#fff',

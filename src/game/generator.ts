@@ -95,12 +95,28 @@ const generateHamiltonianPath = (
     return null;
 };
 
+const generateSnakePath = (size: number): { row: number; col: number }[] => {
+    const path: { row: number; col: number }[] = [];
+    for (let row = 0; row < size; row++) {
+        const cols = row % 2 === 0
+            ? Array.from({ length: size }, (_, col) => col)
+            : Array.from({ length: size }, (_, col) => size - 1 - col);
+        for (const col of cols) {
+            path.push({ row, col });
+        }
+    }
+    return path;
+};
+
 export const generatePuzzle = (level: number): GameGrid => {
     const { size, nodes: nodeCount } = getDifficultyConfig(level);
 
     let path: { row: number; col: number }[] | null = null;
-    while (!path) {
-        path = generateHamiltonianPath(size);
+    path = generateHamiltonianPath(size);
+
+    // fallback to snake path if generation fails
+    if (!path) {
+        path = generateSnakePath(size);
     }
 
     const step = Math.floor(path.length / (nodeCount - 1));
