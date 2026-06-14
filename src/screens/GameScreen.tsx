@@ -15,6 +15,7 @@ import { WinScreen } from '../components/WinScreen';
 import { generatePuzzle, getDifficultyLabel } from '../game/generator';
 import { saveLevel } from '../game/storage';
 import { LoadingScreen } from '../components/LoadingScreen';
+import { getTheme } from '../game/themes';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PADDING = 24;
@@ -41,6 +42,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const gridOffset = useRef({ x: 0, y: 0 });
 
     const cellSize = GRID_SIZE / grid.size;
+    const theme = getTheme(level);
 
     useEffect(() => {
         gridDataRef.current = grid;
@@ -183,7 +185,7 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
     const pathSet = new Set(path.map(cellKey));
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             {isLoading && <LoadingScreen />}
             {isComplete && (
                 <WinScreen
@@ -197,17 +199,17 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
             {/* header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={onHome}>
-                    <Text style={styles.homeButton}>← Home</Text>
+                    <Text style={[styles.homeButton, { color: theme.pathColor }]}>← Home</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Level {level}</Text>
-                <Text style={styles.difficultyText}>{getDifficultyLabel(level)}</Text>
+                <Text style={[styles.title, { color: theme.titleColor }]}>Level {level}</Text>
+                <Text style={[styles.difficultyText, { color: theme.timerColor }]}>{getDifficultyLabel(level)}</Text>
             </View>
 
             {/* timer */}
-            <Text style={styles.timerText}>{formatTime(seconds)}</Text>
+            <Text style={[styles.timerText, { color: theme.timerColor }]}>{formatTime(seconds)}</Text>
 
             {/* board */}
-            <View style={styles.board}>
+            <View style={[styles.board, { borderColor: theme.gridLine, backgroundColor: theme.boardBackground }]}>
                 <View
                     style={{ position: 'relative', width: GRID_SIZE, height: GRID_SIZE }}
                     ref={(ref) => {
@@ -232,8 +234,11 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                                     return (
                                         <GridCell
                                             key={colIndex}
-                                            nodeNumber={grid.nodes[key]}
+                                            cell={cell}
+                                            nodeNumber={grid.nodes[cellKey(cell)]}
                                             cellSize={cellSize}
+                                            gridLineColor={theme.gridLine}
+                                            backgroundColor={theme.boardBackground}
                                         />
                                     );
                                 })}
@@ -246,6 +251,8 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                         path={path}
                         cellSize={cellSize}
                         gridSize={GRID_SIZE}
+                        pathColor={theme.pathColor}
+                        pathFill={theme.pathFill}
                     />
 
                     {/* nodes layer — always on top */}
@@ -262,13 +269,13 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
                                         width: 32,
                                         height: 32,
                                         borderRadius: 16,
-                                        backgroundColor: '#000',
+                                        backgroundColor: theme.nodeBackground,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         zIndex: 100,
                                     }}
                                 >
-                                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>
+                                    <Text style={{ color: theme.nodeText, fontWeight: 'bold', fontSize: 14 }}>
                                         {number}
                                     </Text>
                                 </View>
@@ -280,18 +287,18 @@ export const GameScreen = ({ initialLevel, onLevelChange, onHome }: Props) => {
 
             {/* bottom buttons */}
             <View style={styles.bottomBar}>
-                <TouchableOpacity style={styles.button} onPress={handleUndo}>
-                    <Text style={styles.buttonText}>Undo</Text>
+                <TouchableOpacity style={[styles.button, { borderColor: theme.buttonBorder }]} onPress={handleUndo}>
+                    <Text style={[styles.buttonText, { color: theme.titleColor }]}>Undo</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.button} onPress={handleReset}>
-                    <Text style={styles.buttonText}>Reset</Text>
+                <TouchableOpacity style={[styles.button, { borderColor: theme.buttonBorder }]} onPress={handleReset}>
+                    <Text style={[styles.buttonText, { color: theme.titleColor }]}>Reset</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.button, hintsUsed >= MAX_HINTS && styles.buttonDisabled]}
+                    style={[styles.button, { borderColor: theme.buttonBorder }, hintsUsed >= MAX_HINTS && styles.buttonDisabled]}
                     onPress={handleHint}
                     disabled={hintsUsed >= MAX_HINTS}
                 >
-                    <Text style={[styles.buttonText, hintsUsed >= MAX_HINTS && styles.buttonTextDisabled]}>
+                    <Text style={[styles.buttonText, { color: theme.titleColor }, hintsUsed >= MAX_HINTS && styles.buttonTextDisabled]}>
                         Hint {MAX_HINTS - hintsUsed}/{MAX_HINTS}
                     </Text>
                 </TouchableOpacity>
@@ -310,7 +317,6 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: '#fff',
         alignItems: 'center',
         justifyContent: 'center',
     },

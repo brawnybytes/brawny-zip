@@ -7,9 +7,11 @@ type Props = {
     path: SimpleCell[];
     cellSize: number;
     gridSize: number;
+    pathColor: string;
+    pathFill: string;
 };
 
-export const PathLine = ({ path, cellSize, gridSize }: Props) => {
+export const PathLine = ({ path, cellSize, gridSize, pathColor, pathFill }: Props) => {
     if (path.length === 0) return null;
 
     const offset = cellSize / 2;
@@ -34,7 +36,7 @@ export const PathLine = ({ path, cellSize, gridSize }: Props) => {
         <Svg
             width={gridSize}
             height={gridSize}
-            style={{ position: 'absolute', top: 0, left: 0 }}
+            style={{ position: 'absolute', top: 0, left: 0, backgroundColor: 'transparent' }}
             pointerEvents="none"
         >
             {visitedRects}
@@ -42,7 +44,7 @@ export const PathLine = ({ path, cellSize, gridSize }: Props) => {
                 <Polyline
                     points={points}
                     fill="none"
-                    stroke="#00933c"
+                    stroke={pathColor}
                     strokeWidth={cellSize * 0.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"

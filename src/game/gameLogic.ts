@@ -1,4 +1,4 @@
-import {GameGrid} from './types';
+import { Cell, GameGrid } from './types';
 
 export type SimpleCell = { row: number; col: number };
 
@@ -28,6 +28,21 @@ export const getNextExpectedNode = (
     return maxNode + 1;
 };
 
+const isWallBetween = (
+    from: SimpleCell,
+    to: SimpleCell,
+    grid: GameGrid
+): boolean => {
+    const fromCell = grid.cells[from.row][from.col];
+
+    if (to.row < from.row) return fromCell.walls.top;
+    if (to.row > from.row) return fromCell.walls.bottom;
+    if (to.col > from.col) return fromCell.walls.right;
+    if (to.col < from.col) return fromCell.walls.left;
+
+    return false;
+};
+
 export const canMoveTo = (
     cell: SimpleCell,
     path: SimpleCell[],
@@ -40,6 +55,9 @@ export const canMoveTo = (
     if (!isAdjacent(last, cell)) return false;
 
     if (isInPath(cell, path)) return false;
+
+    // check wall between last and cell
+    if (isWallBetween(last, cell, grid)) return false;
 
     const key = cellKey(cell);
     if (grid.nodes[key]) {

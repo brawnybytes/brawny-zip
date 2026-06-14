@@ -17,15 +17,17 @@ const formatTime = (s: number) => {
 };
 
 const getStars = (seconds: number): number => {
-    if (seconds < 60) return 3;
-    if (seconds < 120) return 2;
+    if (seconds < 10) return 5;
+    if (seconds < 20) return 4;
+    if (seconds < 30) return 3;
+    if (seconds < 40) return 2;
     return 1;
 };
 
 const StarRow = ({stars}: { stars: number }) => {
     return (
         <View style={styles.starRow}>
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3, 4, 5].map(i => (
                 <Text key={i} style={[styles.star, i <= stars ? styles.starFilled : styles.starEmpty]}>
                     ★
                 </Text>
