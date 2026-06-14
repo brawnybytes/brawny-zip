@@ -1,13 +1,14 @@
-import { Cell, GameGrid, Walls } from './types';
+import { Cell, GameGrid } from './types';
 
 const getDifficultyConfig = (level: number): { size: number; nodes: number; walls: number } => {
     let nodes: number;
     let walls: number;
-    if (level <= 3) { nodes = 5; walls = 0; }
-    else if (level <= 6) { nodes = 8; walls = 4; }
-    else if (level <= 9) { nodes = 10; walls = 6; }
-    else if (level <= 12) { nodes = 12; walls = 8; }
-    else { nodes = Math.min(12 + Math.floor((level - 12) / 3), 16); walls = 10; }
+    if (level <= 2) { nodes = 4; walls = 0; }
+    else if (level <= 4) { nodes = 6; walls = 3; }
+    else if (level <= 6) { nodes = 9; walls = 5; }
+    else if (level <= 8) { nodes = 12; walls = 7; }
+    else if (level <= 10) { nodes = 14; walls = 9; }
+    else { nodes = Math.min(14 + Math.floor((level - 10) / 2), 20); walls = Math.min(9 + Math.floor((level - 10) / 2), 16); }
     return { size: 8, nodes, walls };
 };
 
@@ -130,9 +131,9 @@ const addWalls = (
     cells: Cell[][],
     path: { row: number; col: number }[],
     wallCount: number,
-    size: number
+    size: number,
+    nodesMap: Record<string, number>
 ): void => {
-    // collect all internal edges that are NOT used by the solution path
     const solutionEdges = new Set<string>();
     for (let i = 0; i < path.length - 1; i++) {
         const from = path[i];
@@ -142,33 +143,49 @@ const addWalls = (
         solutionEdges.add(`${to.row}-${to.col}-${opposite(dir)}`);
     }
 
-    // collect candidate edges — internal edges not on solution path
-    const candidates: { row: number; col: number; dir: 'top' | 'right' | 'bottom' | 'left' }[] = [];
+    const nodePositions = Object.keys(nodesMap).map(k => {
+        const [r, c] = k.split('-').map(Number);
+        return { row: r, col: c };
+    });
+
+    const distToNearestNode = (row: number, col: number): number => {
+        return Math.min(...nodePositions.map(n =>
+            Math.abs(n.row - row) + Math.abs(n.col - col)
+        ));
+    };
+
+    const candidates: {
+        row: number;
+        col: number;
+        dir: 'top' | 'right' | 'bottom' | 'left';
+        score: number;
+    }[] = [];
+
     for (let row = 0; row < size; row++) {
         for (let col = 0; col < size; col++) {
             const dirs: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'right', 'bottom', 'left'];
             for (const dir of dirs) {
                 const key = `${row}-${col}-${dir}`;
                 if (!solutionEdges.has(key)) {
-                    // skip outer borders
                     if (dir === 'top' && row === 0) continue;
                     if (dir === 'bottom' && row === size - 1) continue;
                     if (dir === 'left' && col === 0) continue;
                     if (dir === 'right' && col === size - 1) continue;
-                    candidates.push({ row, col, dir });
+
+                    const dist = distToNearestNode(row, col);
+                    const score = Math.random() * 0.4 + (1 / (dist + 1)) * 0.6;
+                    candidates.push({ row, col, dir, score });
                 }
             }
         }
     }
 
-    // shuffle and pick wallCount edges
-    const shuffled = shuffle(candidates);
-    let added = 0;
+    candidates.sort((a, b) => b.score - a.score);
 
-    for (const { row, col, dir } of shuffled) {
+    let added = 0;
+    for (const { row, col, dir } of candidates) {
         if (added >= wallCount) break;
 
-        // add wall on both sides of the edge
         cells[row][col].walls[dir] = true;
         const opp = opposite(dir);
         if (dir === 'top' && row > 0) cells[row - 1][col].walls[opp] = true;
@@ -200,7 +217,6 @@ export const generatePuzzle = (level: number): GameGrid => {
         nodesMap[`${cell.row}-${cell.col}`] = i + 1;
     });
 
-    // build cells with empty walls
     const cells: Cell[][] = Array.from({ length: size }, (_, row) =>
         Array.from({ length: size }, (_, col) => ({
             row,
@@ -209,9 +225,8 @@ export const generatePuzzle = (level: number): GameGrid => {
         }))
     );
 
-    // add walls that don't block solution
     if (wallCount > 0) {
-        addWalls(cells, path, wallCount, size);
+        addWalls(cells, path, wallCount, size, nodesMap);
     }
 
     return {
